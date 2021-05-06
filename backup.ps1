@@ -67,7 +67,7 @@ function Invoke-Maintenance {
 
     # forget snapshots based upon the retention policy
     Write-Output "[[Maintenance]] Start forgetting..." | Tee-Object -Append $SuccessLog
-    & $ResticExe --verbose -q forget $SnapshotRetentionPolicy 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
+    & $ResticExe forget $SnapshotRetentionPolicy 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
     if(-not $?) {
         Write-Output "[[Maintenance]] Forget operation completed with errors" | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog
         $maintenance_success = $false
@@ -76,7 +76,7 @@ function Invoke-Maintenance {
     # prune (remove) data from the backup step. Running this separate from `forget` because
     #   `forget` only prunes when it detects removed snapshots upon invocation, not previously removed
     Write-Output "[[Maintenance]] Start pruning..." | Tee-Object -Append $SuccessLog
-    & $ResticExe --verbose -q prune 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
+    & $ResticExe prune $SnapshotPrunePolicy 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
     if(-not $?) {
         Write-Output "[[Maintenance]] Prune operation completed with errors" | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog
         $maintenance_success = $false
@@ -103,7 +103,7 @@ function Invoke-Maintenance {
         $Script:ResticStateLastDeepMaintenance = Get-Date
     }
 
-    & $ResticExe --verbose -q check @data_check 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
+    & $ResticExe check @data_check 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
     if(-not $?) {
         Write-Output "[[Maintenance]] Check completed with errors" | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog
         $maintenance_success = $false
@@ -113,7 +113,7 @@ function Invoke-Maintenance {
     
     if($maintenance_success -eq $true) {
         $Script:ResticStateLastMaintenance = Get-Date
-        $Script:ResticStateMaintenanceCounter = 0;
+        $Script:ResticStateMaintenanceCounter = 0
     }
 }
 
@@ -127,29 +127,17 @@ function Invoke-Backup {
     $starting_location = Get-Location
     ForEach ($item in $BackupSources.GetEnumerator()) {
 
-        $ShadowPath = Join-Path $item.Key 'resticVSS'
+        # Get the source drive letter and set as the root path
+        $root_path = $item.Key
 
-        # check for existance of previous, orphaned VSS directory (and remove it) before creating the shadow copy
-        if(Test-Path $ShadowPath) {
-            Write-Output "[[Backup]] VSS directory exists: '$ShadowPath' - removing. Past script failure?" | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog
-            cmd /c rmdir $ShadowPath
-        }
-        
-        # Create the shadow copy
-        $s1 = (Get-WmiObject -List Win32_ShadowCopy).Create($item.Key, "ClientAccessible")
-        $s2 = Get-WmiObject -Class Win32_ShadowCopy | Where-Object { $_.ID -eq $s1.ShadowID }
-        
-        # Create a symbolic link to the shadow copy
-        $device  = $s2.DeviceObject + "\"
-        cmd /c mklink /d $ShadowPath "$device" 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
-
-        # Build the new list of folders
-        $root_path = $ShadowPath
+        # Avoid storing the drive letter in the backup path if only backing up a single drive
+        # FIXME: this doesn't really work. "C:\" still gets stored
         if($drive_count -eq 1) {
+            Set-Location $root_path
             $root_path = "."
-            Set-Location $ShadowPath
         }
-
+        
+        # Build the new list of folders from settings (if there are any)
         $folder_list = New-Object System.Collections.Generic.List[System.Object]
         ForEach ($path in $item.Value) {
             $p = Join-Path $root_path $path
@@ -157,30 +145,20 @@ function Invoke-Backup {
         }
 
         # backup everything in the root if no folders are provided
-        # note this won't select items with hidden attributes (a good thing to avoid)
         if (-not $folder_list) {
-            ForEach ($path in Get-ChildItem $ShadowPath) {
-                $p = Join-Path $root_path $path
-                $folder_list.Add($p)
-            }
+            $folder_list.Add($root_path)
         }
 
         # Launch Restic
-        & $ResticExe --verbose -q backup $folder_list --exclude-file=$WindowsExcludeFile --exclude-file=$LocalExcludeFile 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
+        & $ResticExe backup $folder_list --use-fs-snapshot --exclude-file=$WindowsExcludeFile --exclude-file=$LocalExcludeFile 3>&1 2>> $ErrorLog | Tee-Object -Append $SuccessLog
         if(-not $?) {
             Write-Output "[[Backup]] Completed with errors" | Tee-Object -Append $ErrorLog | Tee-Object -Append $SuccessLog
             $return_value = $false
         }
-
-        # Delete the shadow copy and remove the symbolic link
-        if($drive_count -eq 1) {
-            Set-Location $starting_location
-        }
-        $s2.Delete()
-        cmd /c rmdir $ShadowPath
-
-        Write-Output "[[Backup]] End $(Get-Date)" | Tee-Object -Append $SuccessLog
     }
+    
+    Set-Location $starting_location
+    Write-Output "[[Backup]] End $(Get-Date)" | Tee-Object -Append $SuccessLog
 
     return $return_value
 }
@@ -213,7 +191,19 @@ function Send-Email {
     }
     if((($status -eq "SUCCESS") -and ($SendEmailOnSuccess -ne $false)) -or ((($status -eq "ERROR") -or $success_after_failure) -and ($SendEmailOnError -ne $false))) {
         $subject = "$env:COMPUTERNAME Restic Backup Report [$status]"
-        Send-MailMessage @ResticEmailConfig -From $ResticEmailFrom -To $ResticEmailTo -Credential $credentials -Subject $subject -Body $body @attachments
+
+        # create a temporary error log to log errors; can't write to the same file that Send-MailMessage is reading
+        $temp_error_log = $ErrorLog + "_temp"
+
+        Send-MailMessage @ResticEmailConfig -From $ResticEmailFrom -To $ResticEmailTo -Credential $credentials -Subject $subject -Body $body @attachments 3>&1 2>> $temp_error_log
+
+        if(-not $?) {
+            Write-Output "[[Email]] Sending email completed with errors" | Tee-Object -Append $temp_error_log | Tee-Object -Append $SuccessLog
+        }
+
+        # join error logs and remove the temporary
+        Get-Content $temp_error_log | Add-Content $ErrorLog
+        Remove-Item $temp_error_log
     }
 }
 
@@ -337,15 +327,15 @@ function Invoke-Main {
             }
         }
 
-        Write-Warning "Errors found! Error Log: $error_log"
+        Write-Output "[[General]] Errors found. Log: $error_log" | Tee-Object -Append $success_log | Tee-Object -Append $error_log
         $error_count++
         
         $attempt_count--
         if($attempt_count -gt 0) {
-            Write-Output "Sleeping for 15 min and then retrying..." | Tee-Object -Append $success_log
+            Write-Output "[[Retry]] Sleeping for 15 min and then retrying..." | Tee-Object -Append $success_log
         }
         else {
-            Write-Output "Retry limit has been reached. No more attempts to backup will be made." | Tee-Object -Append $success_log
+            Write-Output "[[Retry]] Retry limit has been reached. No more attempts to backup will be made." | Tee-Object -Append $success_log
         }
         if($internet_available -eq $true) {
             Invoke-HistoryCheck $success_log $error_log

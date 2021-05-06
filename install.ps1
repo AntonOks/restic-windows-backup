@@ -5,10 +5,10 @@
 if(-not (Test-Path $ResticExe)) {
     $url = $null
     if([Environment]::Is64BitOperatingSystem){
-        $url = "https://github.com/restic/restic/releases/download/v0.9.6/restic_0.9.6_windows_amd64.zip"
+        $url = "https://github.com/restic/restic/releases/download/v0.12.0/restic_0.12.0_windows_amd64.zip"
     }
     else {
-        $url = "https://github.com/restic/restic/releases/download/v0.9.6/restic_0.9.6_windows_386.zip"
+        $url = "https://github.com/restic/restic/releases/download/v0.12.0/restic_0.12.0_windows_386.zip"
     }
     $output = Join-Path $InstallPath "restic.zip"
     Invoke-WebRequest -Uri $url -OutFile $output
@@ -43,7 +43,7 @@ $backup_task_name = "Restic Backup"
 $backup_task = Get-ScheduledTask $backup_task_name -ErrorAction SilentlyContinue
 if($null -eq $backup_task) {
     try {
-        $task_action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NonInteractive -NoLogo -NoProfile -Command ".\backup.ps1; exit $LASTEXITCODE"' -WorkingDirectory $InstallPath
+        $task_action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-ExecutionPolicy Bypass -NonInteractive -NoLogo -NoProfile -Command ".\backup.ps1; exit $LASTEXITCODE"' -WorkingDirectory $InstallPath
         $task_user = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -RunLevel Highest
         $task_settings = New-ScheduledTaskSettingsSet -RestartCount 4 -RestartInterval (New-TimeSpan -Minutes 15) -ExecutionTimeLimit (New-TimeSpan -Days 3) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -DontStopOnIdleEnd -MultipleInstances IgnoreNew -IdleDuration 0 -IdleWaitTimeout 0 -StartWhenAvailable -RestartOnIdle
         $task_trigger = New-ScheduledTaskTrigger -Daily -At 4:00am
