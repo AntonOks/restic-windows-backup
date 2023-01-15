@@ -10,6 +10,7 @@ $LogRetentionDays = 30
 $InternetTestAttempts = 10
 $GlobalRetryAttempts = 4
 $IgnoreMissingBackupSources = $false
+$AdditionalBackupParameters = @("--exclude-if-present", ".nobackup")
 
 # maintenance configuration
 $SnapshotMaintenanceEnabled = $true
@@ -17,7 +18,7 @@ $SnapshotRetentionPolicy = @("--group-by", "host,tags", "--keep-daily", "30", "-
 $SnapshotPrunePolicy = @("--max-unused", "1%")
 $SnapshotMaintenanceInterval = 7
 $SnapshotMaintenanceDays = 30
-$SnapshotDeepMaintenanceDays = 90;
+$SnapshotDeepMaintenanceDays = 90
 
 # email configuration
 $SendEmailOnSuccess = $false
