@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.8](https://github.com/kmwoley/restic-windows-backup/tree/1.8) (2025-02-20)
+[Full Changelog](https://github.com/kmwoley/restic-windows-backup/compare/1.7.1...1.8)
+
+## Summary
+* New features
+  * Added `update.ps1` which makes updating `restic-windows-backup` installations easier.
+  * Added the ability to run custom actions at the start and end of the script execution. Can be used to invoke healthchecks or run custom scripts. Look at `config_sample.ps1` for examples.
+
+* Bug fixes
+  * Explicitly test the backup source media for VSS support instead of assuming it is or is not supported
+  * Install script sets Task Scheduler user LogonType correctly, fixing #40
+  * Error checking of restic.exe results fixed (was broken by release 1.7.1)
+
+## [1.7.1](https://github.com/kmwoley/restic-windows-backup/tree/1.7.1) (2025-02-03)
+[Full Changelog](https://github.com/kmwoley/restic-windows-backup/compare/1.7...1.7.1)
+
+## Summary
+* (Optionally) prevent backup & maintenance while on a metered network connection. By default, backups will occur while on a metered network connection. To disable backups over metered network connections, set `$BackupOnMeteredNetwork = $false` in `config.ps1`
+* Added `$GlobalParameters = @()` configuration variable, which will apply additional configuration parameters every time `restic.exe` is run. This is useful to add options for different types of backend targets.
+* Added `$SelfUpdateEnabled = $true` configuration variable, which can be used to disable `restic.exe` from automatically updating to the latest version when maintenance is run. To disable self update, set `$SelfUpdateEnabled = $false` in `config.ps1`
+ 
+## What's Changed
+* Add optional configuration options for additional parameters to resti… by @woelfisch in https://github.com/kmwoley/restic-windows-backup/pull/96
+* Add feature to control backups on metered connections by @innovara in https://github.com/kmwoley/restic-windows-backup/pull/108
+
+## New Contributors
+* @woelfisch made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/96
+
+## [1.7](https://github.com/kmwoley/restic-windows-backup/tree/1.7) (2025-01-25)
+[Full Changelog](https://github.com/kmwoley/restic-windows-backup/compare/1.6...1.7)
+
+*Upgrade Warning - Future Breaking Change*
+This release deprecates the following `secrets.ps1` variables:
+* `$PSEmailServer` is replaced by `$ResticEmailServer`
+* `$ResticEmailConfig` is replaced by `$ResticEmailPort`
+In the next release, `$ResticEmailServer` and `$ResticEmailPort` will be required. This release will still work if the deprecated variables are defined.
+
+## What's Changed
+* Update README.md by @enzo-g in https://github.com/kmwoley/restic-windows-backup/pull/58
+* fix typo in readme by @jonas-hag in https://github.com/kmwoley/restic-windows-backup/pull/74
+* fix typo by @Export33 in https://github.com/kmwoley/restic-windows-backup/pull/83
+* Added a more detailed example for backup sources by @Export33 in https://github.com/kmwoley/restic-windows-backup/pull/84
+* Limit snapshot pruning to the current host by @living180 in https://github.com/kmwoley/restic-windows-backup/pull/94
+* Allow for unauthenticated SMTP. by @SeeJayEmm in https://github.com/kmwoley/restic-windows-backup/pull/81
+* Replace deprecated Send-MailMessage with Send-MailKitMessage by @innovara in https://github.com/kmwoley/restic-windows-backup/pull/107
+* Merge 2024.11 into Main by @kmwoley in https://github.com/kmwoley/restic-windows-backup/pull/110
+
+## New Contributors
+* @enzo-g made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/58
+* @jonas-hag made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/74
+* @Export33 made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/83
+* @living180 made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/94
+* @SeeJayEmm made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/81
+* @innovara made their first contribution in https://github.com/kmwoley/restic-windows-backup/pull/107
+
 ## [1.6](https://github.com/kmwoley/restic-windows-backup/tree/1.6) (2023-01-14)
 [Full Changelog](https://github.com/kmwoley/restic-windows-backup/compare/1.5...1.6)
 
